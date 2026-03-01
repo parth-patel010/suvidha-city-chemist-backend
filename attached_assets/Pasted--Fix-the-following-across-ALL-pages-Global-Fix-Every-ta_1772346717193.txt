@@ -1,0 +1,39 @@
+"Fix the following across ALL pages:
+🔴 Global Fix — Every table on every page must have an Actions column with:
+
+👁️ View button (eye icon) — opens detail view
+✏️ Edit button (pencil icon) — opens edit form pre-filled with existing data
+🗑️ Delete button (trash icon) — shows confirmation dialog before deleting
+All action buttons should be icon-only with tooltip on hover
+Apply this to: Products, Inventory, Customers, Suppliers, Purchase Orders, Sales, Online Orders, Users pages
+
+🔴 Suppliers Page fixes:
+
+Add Supplier button is not working — fix it to open a form
+Add Actions column (View, Edit, Delete)
+Add Status badge (Active/Inactive)
+Add 'Total Orders' column
+Outstanding amount should be red if > ₹0
+Clicking supplier name opens supplier profile with full ledger, all purchase orders, payment history
+Add Export to Excel button
+Table is too wide and needs horizontal scroll — fix column widths, make it fit properly
+
+🔴 Reports Page fixes:
+
+Add 2 more report tabs: Purchases and Profit & Margin
+Add quick date filter buttons: Today, This Week, This Month, This Quarter, This Year — instead of just manual date input
+GST showing ₹0 because no sales exist yet — add a note 'No sales data yet. Create sales to see GST reports'
+Add Export to PDF and Export to Excel buttons on every report tab
+Sales tab should show: total revenue, total bills, average bill value, top 10 products chart
+Inventory tab should show: total stock value, low stock items, expiry risk items, dead stock
+Customers tab should show: new customers this month, top 10 customers by purchase, loyalty tier distribution pie chart
+GST tab should show: CGST, SGST, IGST summary + invoice-wise detail table
+
+🔴 All pages general fixes:
+
+Every Add button must open a proper modal form — currently most buttons do nothing
+Every form must have proper validation — required fields marked with *, error messages in red
+After saving any form, show a green success toast notification
+After deleting, show an undo option for 5 seconds before permanent delete
+Every page should show total record count: 'Showing X of Y records'
+Add pagination (10/25/50 per page) on all tables"*

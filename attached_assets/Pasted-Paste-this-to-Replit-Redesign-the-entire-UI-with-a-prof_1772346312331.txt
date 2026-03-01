@@ -1,0 +1,63 @@
+Paste this to Replit:
+
+"Redesign the entire UI with a professional, modern pharmacy management aesthetic. Here are the specific requirements:
+Overall Design:
+
+Use a sidebar with dark background (#0F172A navy/slate) with white icons and text
+Main content area with light gray background (#F8FAFC)
+Primary accent color: Blue (#1346C8) for buttons, active states, links
+Secondary accent: Teal (#00B4A2) for success states, badges, highlights
+All cards should have subtle shadows, rounded corners (12px), white background
+Use Inter font throughout
+
+Sidebar:
+
+Dark navy sidebar (#0F172A) with logo at top
+Group menu items into sections: MAIN, OPERATIONS, MANAGEMENT, ANALYTICS
+Active menu item should have blue highlight with left border indicator
+Show notification badge on Alerts, Online Orders
+Bottom of sidebar: user avatar, name, role, logout button
+
+Dashboard:
+
+Top stats row: 4 cards — Today's Sales (blue), Low Stock (amber), Expiring Soon (red), Pending Orders (teal) — each with icon, value, % change vs yesterday
+Second row: Sales trend line chart (last 30 days) + Top 5 products bar chart side by side
+Third row: Recent sales table + Expiry alerts list side by side
+Quick action buttons: New Sale, Add Stock, New Purchase Order, View Reports
+
+POS / Billing Page:
+
+Two-column layout: left side product search + cart, right side payment panel
+Large search bar at top with barcode icon
+Product cards in grid with name, price, stock badge
+Cart shows item, qty, discount, GST, total per line
+Right panel: subtotal, GST breakup (CGST+SGST), discount, loyalty points, grand total
+Big green 'Complete Sale' button at bottom right
+Keyboard shortcut hints visible on screen
+
+Tables (all pages):
+
+Striped rows, hover highlight
+Status badges with colors: green=active/completed, amber=pending/low, red=expired/critical
+Action buttons: Edit (blue), Delete (red), View (gray) — icon only with tooltip
+Pagination at bottom
+Search + filter bar at top of every table
+
+Forms:
+
+Clean white card with section headings
+Input fields with clear labels, placeholder text, validation errors in red
+Required field marker (*)
+Save button blue, Cancel button outlined
+
+Mobile Responsive:
+
+Sidebar collapses to hamburger menu on mobile
+Cards stack vertically on small screens
+POS works on tablet screen minimum
+
+Fix these bugs too:
+
+Dashboard showing +12% when sales are ₹0 — hide % change if no previous data
+All 0 values — verify seed data is loaded
+Add missing sidebar items: Loyalty, WhatsApp, AI Analytics, Branches, Users, Alerts"*

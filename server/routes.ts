@@ -131,6 +131,22 @@ import type { Express } from "express";
             eq(sales.status, "COMPLETED")
           ));
 
+        // Yesterday's sales (for comparison)
+        const yesterdayStart = new Date();
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        yesterdayStart.setHours(0, 0, 0, 0);
+        const yesterdayEnd = new Date(todayStart);
+
+        const yesterdaySales = await db
+          .select({ total: sql`SUM(${sales.totalAmount})`, count: sql`COUNT(*)` })
+          .from(sales)
+          .where(and(
+            eq(sales.branchId, branchId),
+            gte(sales.saleDate, yesterdayStart),
+            lte(sales.saleDate, yesterdayEnd),
+            eq(sales.status, "COMPLETED")
+          ));
+
         // Low stock items
         const lowStockCount = await db
           .select({ count: sql`COUNT(*)` })
@@ -165,14 +181,72 @@ import type { Express } from "express";
             )
           ));
 
+        // Last 7 days sales trend
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+
+        const salesTrend = await db
+          .select({
+            date: sql<string>`DATE(${sales.saleDate})`,
+            total: sql<string>`COALESCE(SUM(${sales.totalAmount}), 0)`,
+            count: sql<number>`COUNT(*)`
+          })
+          .from(sales)
+          .where(and(
+            eq(sales.branchId, branchId),
+            gte(sales.saleDate, sevenDaysAgo),
+            eq(sales.status, "COMPLETED")
+          ))
+          .groupBy(sql`DATE(${sales.saleDate})`)
+          .orderBy(sql`DATE(${sales.saleDate})`);
+
+        // Recent 5 sales
+        const recentSales = await db.query.sales.findMany({
+          where: and(
+            eq(sales.branchId, branchId),
+            eq(sales.status, "COMPLETED")
+          ),
+          with: {
+            customer: true,
+            saleItems: {
+              with: { product: true }
+            }
+          },
+          orderBy: [desc(sales.saleDate)],
+          limit: 5
+        });
+
+        // Expiry alerts (items expiring within 30 days)
+        const expiryAlertItems = await db.query.inventory.findMany({
+          where: and(
+            eq(inventory.branchId, branchId),
+            lte(inventory.expiryDate, expiryThreshold),
+            gte(inventory.expiryDate, new Date()),
+            sql`${inventory.quantityInStock} > 0`
+          ),
+          with: {
+            product: true
+          },
+          orderBy: [inventory.expiryDate],
+          limit: 10
+        });
+
         res.json({
           todaySales: {
             total: todaySales[0]?.total || 0,
             count: todaySales[0]?.count || 0
           },
+          yesterdaySales: {
+            total: yesterdaySales[0]?.total || 0,
+            count: yesterdaySales[0]?.count || 0
+          },
           lowStockItems: lowStockCount[0]?.count || 0,
           expiringItems: expiringCount[0]?.count || 0,
-          pendingOrders: pendingOrdersCount[0]?.count || 0
+          pendingOrders: pendingOrdersCount[0]?.count || 0,
+          salesTrend,
+          recentSales,
+          expiryAlerts: expiryAlertItems
         });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -204,17 +278,23 @@ import type { Express } from "express";
     // ========== PRODUCTS ==========
     app.get("/api/products", authenticateToken, async (req, res) => {
       try {
-        const { search, categoryId } = req.query;
-        let query = db.query.products.findMany({
+        const { search, categoryId, status } = req.query;
+        let whereCondition: any = undefined;
+        if (status === "active") {
+          whereCondition = eq(products.isActive, true);
+        } else if (status === "inactive") {
+          whereCondition = eq(products.isActive, false);
+        }
+
+        let allProducts = await db.query.products.findMany({
           with: {
             category: true,
-            manufacturer: true
+            manufacturer: true,
+            inventory: true
           },
-          where: eq(products.isActive, true),
+          where: whereCondition,
           orderBy: [products.productName]
         });
-
-        let allProducts = await query;
 
         // Apply filters
         if (search) {
@@ -281,6 +361,19 @@ import type { Express } from "express";
       }
     });
 
+    app.delete("/api/products/:id", authenticateToken, async (req, res) => {
+      try {
+        const [updated] = await db
+          .update(products)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(products.id, parseInt(req.params.id)))
+          .returning();
+        res.json({ success: true, product: updated });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
     // ========== INVENTORY ==========
     app.get("/api/inventory", authenticateToken, async (req: any, res) => {
       try {
@@ -324,6 +417,15 @@ import type { Express } from "express";
           .where(eq(inventory.id, parseInt(req.params.id)))
           .returning();
         res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.delete("/api/inventory/:id", authenticateToken, async (req, res) => {
+      try {
+        await db.delete(inventory).where(eq(inventory.id, parseInt(req.params.id)));
+        res.json({ success: true });
       } catch (error: any) {
         res.status(400).json({ error: error.message });
       }
@@ -404,6 +506,19 @@ import type { Express } from "express";
           .where(eq(customers.id, parseInt(req.params.id)))
           .returning();
         res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.delete("/api/customers/:id", authenticateToken, async (req, res) => {
+      try {
+        const [updated] = await db
+          .update(customers)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(customers.id, parseInt(req.params.id)))
+          .returning();
+        res.json({ success: true, customer: updated });
       } catch (error: any) {
         res.status(400).json({ error: error.message });
       }
@@ -699,7 +814,6 @@ import type { Express } from "express";
 
     app.post("/api/suppliers", authenticateToken, async (req, res) => {
       try {
-        // Generate supplier code
         const lastSupplier = await db.query.suppliers.findFirst({
           orderBy: [desc(suppliers.id)]
         });
@@ -714,6 +828,254 @@ import type { Express } from "express";
         res.status(201).json(newSupplier);
       } catch (error: any) {
         res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.put("/api/suppliers/:id", authenticateToken, async (req, res) => {
+      try {
+        const [updated] = await db
+          .update(suppliers)
+          .set({ ...req.body, updatedAt: new Date() })
+          .where(eq(suppliers.id, parseInt(req.params.id)))
+          .returning();
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.delete("/api/suppliers/:id", authenticateToken, async (req, res) => {
+      try {
+        const [updated] = await db
+          .update(suppliers)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(suppliers.id, parseInt(req.params.id)))
+          .returning();
+        res.json({ success: true, supplier: updated });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ========== PURCHASE ORDERS ==========
+    app.get("/api/purchase-orders", authenticateToken, async (req: any, res) => {
+      try {
+        const branchId = req.query.branchId || req.user.branchId;
+        const { status } = req.query;
+
+        let whereConditions: any = eq(purchaseOrders.branchId, parseInt(branchId));
+
+        if (status) {
+          whereConditions = and(whereConditions, eq(purchaseOrders.status, status as string));
+        }
+
+        const orders = await db.query.purchaseOrders.findMany({
+          where: whereConditions,
+          with: {
+            supplier: true,
+            items: {
+              with: {
+                product: true
+              }
+            }
+          },
+          orderBy: [desc(purchaseOrders.createdAt)],
+          limit: 100
+        });
+
+        res.json(orders);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.get("/api/purchase-orders/:id", authenticateToken, async (req, res) => {
+      try {
+        const order = await db.query.purchaseOrders.findFirst({
+          where: eq(purchaseOrders.id, parseInt(req.params.id)),
+          with: {
+            supplier: true,
+            branch: true,
+            items: {
+              with: {
+                product: true
+              }
+            }
+          }
+        });
+
+        if (!order) {
+          return res.status(404).json({ error: "Purchase order not found" });
+        }
+
+        res.json(order);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/purchase-orders", authenticateToken, async (req: any, res) => {
+      try {
+        const { items, ...poData } = req.body;
+
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const lastPO = await db.query.purchaseOrders.findFirst({
+          orderBy: [desc(purchaseOrders.id)]
+        });
+        const nextId = (lastPO?.id || 0) + 1;
+        const poNumber = `PO-${dateStr}-${nextId.toString().padStart(5, '0')}`;
+
+        const [newPO] = await db.insert(purchaseOrders).values({
+          ...poData,
+          poNumber,
+          branchId: req.user.branchId,
+          createdBy: req.user.id,
+          status: poData.status || "DRAFT",
+          expectedDeliveryDate: poData.expectedDeliveryDate ? new Date(poData.expectedDeliveryDate) : null
+        }).returning();
+
+        if (items && items.length > 0) {
+          for (const item of items) {
+            await db.insert(purchaseOrderItems).values({
+              purchaseOrderId: newPO.id,
+              ...item
+            });
+          }
+        }
+
+        res.status(201).json({ purchaseOrderId: newPO.id, poNumber });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.put("/api/purchase-orders/:id/status", authenticateToken, async (req: any, res) => {
+      try {
+        const { status } = req.body;
+        const [updated] = await db
+          .update(purchaseOrders)
+          .set({ status, updatedAt: new Date() })
+          .where(eq(purchaseOrders.id, parseInt(req.params.id)))
+          .returning();
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/purchase-orders/:id/receive", authenticateToken, async (req: any, res) => {
+      try {
+        const poId = parseInt(req.params.id);
+        const { receivedItems } = req.body;
+
+        const [updatedPO] = await db
+          .update(purchaseOrders)
+          .set({ status: "RECEIVED", updatedAt: new Date() })
+          .where(eq(purchaseOrders.id, poId))
+          .returning();
+
+        if (receivedItems && receivedItems.length > 0) {
+          for (const item of receivedItems) {
+            await db
+              .update(purchaseOrderItems)
+              .set({ receivedQuantity: item.receivedQuantity })
+              .where(eq(purchaseOrderItems.id, item.id));
+
+            if (item.addToInventory) {
+              await db.insert(inventory).values({
+                productId: item.productId,
+                branchId: req.user.branchId,
+                batchNumber: item.batchNumber,
+                expiryDate: new Date(item.expiryDate),
+                purchasePrice: item.unitPrice,
+                sellingPrice: item.sellingPrice || item.unitPrice,
+                mrp: item.mrp || item.unitPrice,
+                gstPercentage: item.gstPercentage || "0",
+                quantityInStock: item.receivedQuantity,
+                reorderLevel: item.reorderLevel || 10,
+                supplierId: updatedPO.supplierId,
+                location: item.location || null
+              });
+            }
+          }
+        }
+
+        res.json(updatedPO);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    app.delete("/api/purchase-orders/:id", authenticateToken, async (req, res) => {
+      try {
+        const poId = parseInt(req.params.id);
+        await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+        await db.delete(purchaseOrders).where(eq(purchaseOrders.id, poId));
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ========== ROLES ==========
+    app.get("/api/roles", authenticateToken, async (req, res) => {
+      try {
+        const allRoles = await db.query.roles.findMany({
+          orderBy: [roles.roleName]
+        });
+        res.json(allRoles);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // ========== USERS MANAGEMENT ==========
+    app.get("/api/users", authenticateToken, async (req, res) => {
+      try {
+        const allUsers = await db.query.users.findMany({
+          with: { role: true, branch: true },
+          orderBy: [users.fullName]
+        });
+        res.json(allUsers.map(u => ({
+          id: u.id,
+          username: u.username,
+          fullName: u.fullName,
+          email: u.email,
+          phone: u.phone,
+          role: u.role,
+          branch: u.branch,
+          isActive: u.isActive,
+          lastLogin: u.lastLogin,
+          createdAt: u.createdAt
+        })));
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // ========== LOYALTY TIERS ==========
+    app.get("/api/loyalty-tiers", authenticateToken, async (req, res) => {
+      try {
+        const tiers = await db.query.loyaltyTiers.findMany({
+          orderBy: [loyaltyTiers.minPoints]
+        });
+        res.json(tiers);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // ========== AUDIT LOGS ==========
+    app.get("/api/audit-logs", authenticateToken, async (req: any, res) => {
+      try {
+        const logs = await db.query.auditLogs.findMany({
+          orderBy: [desc(auditLogs.createdAt)],
+          limit: 100
+        });
+        res.json(logs);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
     });
 

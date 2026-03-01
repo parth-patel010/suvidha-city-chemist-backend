@@ -1,3 +1,12 @@
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+if (existsSync(join(process.cwd(), ".env"))) {
+  const env = readFileSync(join(process.cwd(), ".env"), "utf8");
+  for (const line of env.split(/\r?\n/)) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
+  }
+}
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
@@ -7,6 +16,22 @@ import { serveStatic } from "./static";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// CORS: when frontend is on a different origin (e.g. Vercel), set CORS_ORIGIN to that origin
+const corsOrigin = process.env.CORS_ORIGIN;
+if (corsOrigin) {
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+}
 
 function log(message: string) {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -66,7 +91,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const PORT = 5000;
+  const PORT = Number(process.env.PORT) || 5000;
   server.listen(PORT, "0.0.0.0", () => {
     log(`Suvidha Pharmacy Pro server running on port ${PORT}`);
   });

@@ -6,6 +6,7 @@ import { useState } from "react";
   import { Input } from "@/components/ui/input";
   import { Label } from "@/components/ui/label";
   import { useToast } from "@/hooks/use-toast";
+  import { apiUrl } from "@/lib/api";
 
   export default function Login() {
     const [, setLocation] = useLocation();
@@ -21,7 +22,7 @@ import { useState } from "react";
       setLoading(true);
 
       try {
-        const response = await fetch("/api/auth/login", {
+        const response = await fetch(apiUrl("/api/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(credentials),
@@ -114,7 +115,7 @@ import { useState } from "react";
             <div className="mt-6 p-4 bg-muted rounded-lg">
               <p className="text-sm font-medium mb-2">Demo Credentials:</p>
               <div className="text-xs space-y-1">
-                <p><strong>Admin:</strong> admin / password123</p>
+                <p><strong>Admin:</strong> admin / admin123</p>
                 <p><strong>Manager:</strong> manager1 / password123</p>
                 <p><strong>Cashier:</strong> cashier1 / password123</p>
               </div>

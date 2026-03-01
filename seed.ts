@@ -4,11 +4,23 @@ import { db } from "./server/db";
     products, inventory, customers, loyaltyTiers, whatsappTemplates
   } from "./shared/schema";
   import bcrypt from "bcrypt";
+  import { eq } from "drizzle-orm";
 
   async function seed() {
     console.log("🌱 Seeding database...");
 
     try {
+      // Skip if already seeded (admin exists)
+      const existing = await db.select().from(users).where(eq(users.username, "admin")).limit(1);
+      if (existing.length > 0) {
+        console.log("✅ Database already seeded. Default credentials:");
+        console.log("   Admin:    admin / admin123");
+        console.log("   Manager:  manager1 / password123");
+        console.log("   Cashier:  cashier1 / password123");
+        process.exit(0);
+        return;
+      }
+
       // 1. Create Roles
       console.log("Creating roles...");
       const [adminRole] = await db.insert(roles).values({
@@ -79,11 +91,12 @@ import { db } from "./server/db";
       // 3. Create Users
       console.log("Creating users...");
       const hashedPassword = await bcrypt.hash("password123", 10);
+      const hashedAdminPassword = await bcrypt.hash("admin123", 10);
 
       const [adminUser] = await db.insert(users).values({
         username: "admin",
         email: "admin@suvidhachemist.com",
-        passwordHash: hashedPassword,
+        passwordHash: hashedAdminPassword,
         fullName: "System Administrator",
         phone: "+91-9876543210",
         roleId: adminRole.id,
@@ -501,14 +514,9 @@ import { db } from "./server/db";
       console.log("✅ Database seeded successfully!");
       console.log("");
       console.log("📋 Login Credentials:");
-      console.log("   Username: admin");
-      console.log("   Password: password123");
-      console.log("");
-      console.log("   Username: manager1");
-      console.log("   Password: password123");
-      console.log("");
-      console.log("   Username: cashier1");
-      console.log("   Password: password123");
+      console.log("   Admin:    admin / admin123");
+      console.log("   Manager:  manager1 / password123");
+      console.log("   Cashier:  cashier1 / password123");
 
       process.exit(0);
     } catch (error) {

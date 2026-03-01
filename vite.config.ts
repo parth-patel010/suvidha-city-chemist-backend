@@ -3,7 +3,12 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+let __dirname: string;
+try {
+  __dirname = path.dirname(fileURLToPath(import.meta.url));
+} catch {
+  __dirname = process.cwd();
+}
 
 // Replit plugins only in development on Replit; skip on Vercel/Render to avoid build issues
 let replitPlugins: any[] = [];

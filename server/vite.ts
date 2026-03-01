@@ -7,10 +7,21 @@ import path from "path";
 import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const viteLogger = createLogger();
 
+function getClientDir(): string {
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.url) {
+      return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "client");
+    }
+  } catch {
+    // CJS bundle or no import.meta
+  }
+  return path.join(process.cwd(), "client");
+}
+
 export async function setupVite(server: Server, app: Express) {
+  const clientDir = getClientDir();
   const serverOptions = {
     middlewareMode: true,
     hmr: { server, path: "/vite-hmr" },
@@ -37,12 +48,7 @@ export async function setupVite(server: Server, app: Express) {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        __dirname,
-        "..",
-        "client",
-        "index.html",
-      );
+      const clientTemplate = path.resolve(clientDir, "index.html");
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");

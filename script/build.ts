@@ -36,7 +36,16 @@ async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
-  await viteBuild();
+  try {
+    await viteBuild();
+  } catch (err: any) {
+    console.error("Vite build failed:", err?.message || err);
+    if (err?.code) console.error("Code:", err.code);
+    if (err?.plugin) console.error("Plugin:", err.plugin);
+    if (err?.id) console.error("File:", err.id);
+    if (err?.stack) console.error(err.stack);
+    throw err;
+  }
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
@@ -62,6 +71,7 @@ async function buildAll() {
 }
 
 buildAll().catch((err) => {
-  console.error(err);
+  console.error("Build failed:", err);
+  if (err?.stack) console.error(err.stack);
   process.exit(1);
 });

@@ -37,6 +37,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    sourcemap: false,
+    rollupOptions: {
+      onwarn(_, warn) {
+        // Downgrade rollup warnings so they don't fail the build
+        if (warn.code === "UNUSED_EXTERNAL_IMPORT" || warn.code === "CIRCULAR_DEPENDENCY") return;
+        console.warn(warn.message);
+      },
+    },
   },
   server: {
     fs: {
